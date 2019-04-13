@@ -1,16 +1,16 @@
 {
-  "name": "nodebb-plugin-sso-facebook",
+  "name": "nodebb-plugin-sso-xsolla",
   "version": "3.5.0",
-  "description": "NodeBB Facebook SSO",
+  "description": "NodeBB Xsolla SSO",
   "main": "library.js",
   "repository": {
     "type": "git",
-    "url": "https://github.com/julianlam/nodebb-plugin-sso-facebook"
+    "url": "https://github.com/woodroow/nodebb-plugin-sso-xsolla"
   },
   "keywords": [
     "nodebb",
     "plugin",
-    "facebook",
+    "xsolla",
     "sso",
     "single sign on",
     "registration"
@@ -21,12 +21,12 @@
   },
   "license": "MIT",
   "bugs": {
-    "url": "https://github.com/julianlam/nodebb-plugin-sso-facebook/issues"
+    "url": "https://github.com/woodroow/nodebb-plugin-sso-xsolla/issues"
   },
   "readme": "",
   "readmeFilename": "README.md",
   "dependencies": {
-    "passport-facebook": "~1.0.2"
+    "passport-jwt": "^4.0.0"
   },
   "nbbpm": {
     "compatibility": "^1.7.1"

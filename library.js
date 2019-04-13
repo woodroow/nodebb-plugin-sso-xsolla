@@ -6,7 +6,7 @@
 		meta = require.main.require('./src/meta'),
 		db = require.main.require('./src/database'),
 		passport = require.main.require('passport'),
-		passportFacebook = require('passport-facebook').Strategy,
+		passportJwt = require('passport-jwt').Strategy,
 		nconf = require.main.require('nconf'),
 		async = require.main.require('async'),
 		winston = require.main.require('winston');
@@ -14,36 +14,36 @@
 	var authenticationController = require.main.require('./src/controllers/authentication');
 
 	var constants = Object.freeze({
-		'name': 'Facebook',
+		'name': 'Xsolla',
 		'admin': {
-			'route': '/plugins/sso-facebook',
-			'icon': 'fa-facebook-square'
+			'route': '/plugins/sso-xsolla',
+			'icon': 'fa-sign-in'
 		}
 	});
 
-	var Facebook = {
+	var Xsolla = {
 		settings: undefined
 	};
 
-	Facebook.init = function (params, callback) {
+	Xsolla.init = function (params, callback) {
 		var hostHelpers = require.main.require('./src/routes/helpers');
 
 		function render(req, res) {
-			res.render('admin/plugins/sso-facebook', {
+			res.render('admin/plugins/sso-xsolla', {
 				baseUrl: nconf.get('url'),
 			});
 		}
 
-		params.router.get('/admin/plugins/sso-facebook', params.middleware.admin.buildHeader, render);
-		params.router.get('/api/admin/plugins/sso-facebook', render);
+		params.router.get('/admin/plugins/sso-xsolla', params.middleware.admin.buildHeader, render);
+		params.router.get('/api/admin/plugins/sso-xsolla', render);
 
-		hostHelpers.setupPageRoute(params.router, '/deauth/facebook', params.middleware, [params.middleware.requireUser], function (req, res) {
-			res.render('plugins/sso-facebook/deauth', {
-				service: "Facebook",
+		hostHelpers.setupPageRoute(params.router, '/deauth/xsolla', params.middleware, [params.middleware.requireUser], function (req, res) {
+			res.render('plugins/sso-xsolla/deauth', {
+				service: "Xsolla",
 			});
 		});
-		params.router.post('/deauth/facebook', [params.middleware.requireUser, params.middleware.applyCSRF], function (req, res, next) {
-			Facebook.deleteUserData({
+		params.router.post('/deauth/xsolla', [params.middleware.requireUser, params.middleware.applyCSRF], function (req, res, next) {
+			Xsolla.deleteUserData({
 				uid: req.user.uid,
 			}, function (err) {
 				if (err) {
@@ -57,33 +57,33 @@
 		callback();
 	};
 
-	Facebook.getSettings = function (callback) {
-		if (Facebook.settings) {
+	Xsolla.getSettings = function (callback) {
+		if (Xsolla.settings) {
 			return callback();
 		}
 
-		meta.settings.get('sso-facebook', function (err, settings) {
-			Facebook.settings = settings;
+		meta.settings.get('sso-xsolla', function (err, settings) {
+			Xsolla.settings = settings;
 			callback();
 		});
 	}
 
-	Facebook.getStrategy = function (strategies, callback) {
-		if (!Facebook.settings) {
-			return Facebook.getSettings(function () {
-				Facebook.getStrategy(strategies, callback);
+	Xsolla.getStrategy = function (strategies, callback) {
+		if (!Xsolla.settings) {
+			return Xsolla.getSettings(function () {
+				Xsolla.getStrategy(strategies, callback);
 			});
 		}
 
 		if (
-			Facebook.settings !== undefined &&
-			Facebook.settings.hasOwnProperty('app_id') && Facebook.settings.app_id &&
-			Facebook.settings.hasOwnProperty('secret') && Facebook.settings.secret
+			Xsolla.settings !== undefined &&
+			Xsolla.settings.hasOwnProperty('app_id') && Xsolla.settings.app_id &&
+			Xsolla.settings.hasOwnProperty('secret') && Xsolla.settings.secret
 		) {
-			passport.use(new passportFacebook({
-				clientID: Facebook.settings.app_id,
-				clientSecret: Facebook.settings.secret,
-				callbackURL: nconf.get('url') + '/auth/facebook/callback',
+			passport.use(new passportJwt({
+				clientID: Xsolla.settings.app_id,
+				clientSecret: Xsolla.settings.secret,
+				callbackURL: nconf.get('url') + '/auth/xsolla/callback',
 				passReqToCallback: true,
 				profileFields: ['id', 'emails', 'name', 'displayName'],
 				enableProof: true,
@@ -108,16 +108,16 @@
 					if (profile._json.hasOwnProperty('email')) {
 						email = profile._json.email;
 					} else {
-						email = (profile.username ? profile.username : profile.id) + '@facebook.com';
+						email = (profile.username ? profile.username : profile.id) + '@xsolla.com';
 					}
 
-					Facebook.login(profile.id, profile.displayName, email, 'https://graph.facebook.com/' + profile.id + '/picture?type=large', accessToken, refreshToken, profile, function (err, user) {
+					Xsolla.login(profile.id, profile.displayName, email, 'https://graph.xsolla.com/' + profile.id + '/picture?type=large', accessToken, refreshToken, profile, function (err, user) {
 						if (err) {
 							return done(err);
 						}
 
 						// Require collection of email
-						if (email.endsWith('@facebook.com')) {
+						if (email.endsWith('@xsolla.com')) {
 							req.session.registration = req.session.registration || {};
 							req.session.registration.uid = user.uid;
 							req.session.registration.fbid = profile.id;
@@ -131,9 +131,9 @@
 			}));
 
 			strategies.push({
-				name: 'facebook',
-				url: '/auth/facebook',
-				callbackURL: '/auth/facebook/callback',
+				name: 'xsolla',
+				url: '/auth/xsolla',
+				callbackURL: '/auth/xsolla/callback',
 				icon: constants.admin.icon,
 				scope: 'public_profile, email'
 			});
@@ -142,12 +142,12 @@
 		callback(null, strategies);
 	};
 
-	Facebook.appendUserHashWhitelist = function (data, callback) {
+	Xsolla.appendUserHashWhitelist = function (data, callback) {
 		data.whitelist.push('fbid');
 		return setImmediate(callback, null, data);
 	};
 
-	Facebook.getAssociation = function (data, callback) {
+	Xsolla.getAssociation = function (data, callback) {
 		user.getUserField(data.uid, 'fbid', function (err, fbId) {
 			if (err) {
 				return callback(err, data);
@@ -156,15 +156,15 @@
 			if (fbId) {
 				data.associations.push({
 					associated: true,
-					url: 'https://facebook.com/' + fbId,
-					deauthUrl: nconf.get('url') + '/deauth/facebook',
+					url: 'https://xsolla.com/' + fbId,
+					deauthUrl: nconf.get('url') + '/deauth/xsolla',
 					name: constants.name,
 					icon: constants.admin.icon
 				});
 			} else {
 				data.associations.push({
 					associated: false,
-					url: nconf.get('url') + '/auth/facebook',
+					url: nconf.get('url') + '/auth/xsolla',
 					name: constants.name,
 					icon: constants.admin.icon
 				});
@@ -174,17 +174,17 @@
 		})
 	};
 
-	Facebook.prepareInterstitial = function (data, callback) {
+	Xsolla.prepareInterstitial = function (data, callback) {
 		// Only execute if:
 		//   - uid and fbid are set in session
-		//   - email ends with "@facebook.com"
+		//   - email ends with "@xsolla.com"
 		if (data.userData.hasOwnProperty('uid') && data.userData.hasOwnProperty('fbid')) {
 			user.getUserField(data.userData.uid, 'email', function (err, email) {
-				if (email && email.endsWith('@facebook.com')) {
+				if (email && email.endsWith('@xsolla.com')) {
 					data.interstitials.push({
-						template: 'partials/sso-facebook/email.tpl',
+						template: 'partials/sso-xsolla/email.tpl',
 						data: {},
-						callback: Facebook.storeAdditionalData
+						callback: Xsolla.storeAdditionalData
 					});
 				}
 
@@ -195,7 +195,7 @@
 		}
 	};
 
-	Facebook.storeAdditionalData = function (userData, data, callback) {
+	Xsolla.storeAdditionalData = function (userData, data, callback) {
 		async.waterfall([
 			// Reset email confirm throttle
 			async.apply(db.delete, 'uid:' + userData.uid + ':confirm:email:sent'),
@@ -209,24 +209,24 @@
 		], callback);
 	};
 
-	Facebook.storeTokens = function (uid, accessToken, refreshToken) {
+	Xsolla.storeTokens = function (uid, accessToken, refreshToken) {
 		//JG: Actually save the useful stuff
 		winston.verbose("Storing received fb access information for uid(" + uid + ") accessToken(" + accessToken + ") refreshToken(" + refreshToken + ")");
 		user.setUserField(uid, 'fbaccesstoken', accessToken);
 		user.setUserField(uid, 'fbrefreshtoken', refreshToken);
 	};
 
-	Facebook.login = function (fbid, name, email, picture, accessToken, refreshToken, profile, callback) {
-		winston.verbose("Facebook.login fbid, name, email, picture: " + fbid + ", " + name + ", " + email + ", " + picture);
+	Xsolla.login = function (fbid, name, email, picture, accessToken, refreshToken, profile, callback) {
+		winston.verbose("Xsolla.login fbid, name, email, picture: " + fbid + ", " + name + ", " + email + ", " + picture);
 
-		Facebook.getUidByFbid(fbid, function (err, uid) {
+		Xsolla.getUidByFbid(fbid, function (err, uid) {
 			if (err) {
 				return callback(err);
 			}
 
 			if (uid !== null) {
 				// Existing User
-				Facebook.storeTokens(uid, accessToken, refreshToken);
+				Xsolla.storeTokens(uid, accessToken, refreshToken);
 
 				callback(null, {
 					uid: uid
@@ -234,10 +234,10 @@
 			} else {
 				// New User
 				var success = function (uid) {
-					// Save facebook-specific information to the user
+					// Save xsolla-specific information to the user
 					user.setUserField(uid, 'fbid', fbid);
 					db.setObjectField('fbid:uid', fbid, uid);
-					var autoConfirm = Facebook.settings && Facebook.settings.autoconfirm === "on" ? 1 : 0;
+					var autoConfirm = Xsolla.settings && Xsolla.settings.autoconfirm === "on" ? 1 : 0;
 					user.setUserField(uid, 'email:confirmed', autoConfirm);
 
 					if (autoConfirm) {
@@ -250,7 +250,7 @@
 						user.setUserField(uid, 'picture', picture);
 					}
 
-					Facebook.storeTokens(uid, accessToken, refreshToken);
+					Xsolla.storeTokens(uid, accessToken, refreshToken);
 
 					callback(null, {
 						uid: uid
@@ -264,8 +264,8 @@
 
 					if (!uid) {
 						// Abort user creation if registration via SSO is restricted
-						if (Facebook.settings.disableRegistration === 'on') {
-							return callback(new Error('[[error:sso-registration-disabled, Facebook]]'));
+						if (Xsolla.settings.disableRegistration === 'on') {
+							return callback(new Error('[[error:sso-registration-disabled, Xsolla]]'));
 						}
 
 						user.create({ username: name, email: email }, function (err, uid) {
@@ -283,7 +283,7 @@
 		});
 	};
 
-	Facebook.getUidByFbid = function (fbid, callback) {
+	Xsolla.getUidByFbid = function (fbid, callback) {
 		db.getObjectField('fbid:uid', fbid, function (err, uid) {
 			if (err) {
 				return callback(err);
@@ -292,7 +292,7 @@
 		});
 	};
 
-	Facebook.addMenuItem = function (custom_header, callback) {
+	Xsolla.addMenuItem = function (custom_header, callback) {
 		custom_header.authentication.push({
 			'route': constants.admin.route,
 			'icon': constants.admin.icon,
@@ -302,7 +302,7 @@
 		callback(null, custom_header);
 	};
 
-	Facebook.deleteUserData = function (data, callback) {
+	Xsolla.deleteUserData = function (data, callback) {
 		var uid = data.uid;
 
 		async.waterfall([
@@ -315,12 +315,12 @@
 			},
 		], function (err) {
 			if (err) {
-				winston.error('[sso-facebook] Could not remove OAuthId data for uid ' + uid + '. Error: ' + err);
+				winston.error('[sso-xsolla] Could not remove OAuthId data for uid ' + uid + '. Error: ' + err);
 				return callback(err);
 			}
 			callback(null, uid);
 		});
 	};
 
-	module.exports = Facebook;
+	module.exports = Xsolla;
 }(module));
